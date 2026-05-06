@@ -1,21 +1,13 @@
 import { useState } from "react";
-import { initializeApp} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  updateDoc,
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
-import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"
-const auth = getAuth();
+import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"
+import { useNavigate } from "react-router-dom";
+import { auth } from "../auths/firebase";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const navigate = useNavigate();
 
     async function handleLogin(e) {
         e.preventDefault();
@@ -23,7 +15,7 @@ export default function LoginPage() {
 
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            window.location.href = "/admin";
+            navigate("/admin");
         } catch (err) {
             setError("Invalid email or password");
             console.error(err)

@@ -1,260 +1,281 @@
+import { db } from "../auths/firebase";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
+  setDoc,
   doc,
   updateDoc,
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
-
-import { db } from "../auths/firebase";
+  getDocs,
+  collection
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { signOut, getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+const auth = getAuth();
 
 import CloudinaryModal from "../components/cloudinaryModal";
 
 export default function AdminPage() {
-  const [pageId, setPageId] = useState("");
+
+  const [pages, setPages] = useState([]);
+  const [selectedPage, setSelectedPage] = useState("");
   const [posts, setPosts] = useState([]);
-  const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(false);
+
+  const [newPageId, setNewPageId] = useState("");
 
   const [form, setForm] = useState({
     title: "",
     description: "",
     content: "",
     image1: "",
-    image2: "",
+    image2: ""
   });
 
+  const [editingId, setEditingId] = useState(null);
+  const [toast, setToast] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [uploadTarget, setUploadTarget] = useState("image1");
+  const [uploadTarget, setUploadTarget] = useState("");
+  const navigate = useNavigate();
 
-  // 🔥 LIMIT
-  const MAX_POSTS = 13;
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2500);
+  }
+
+  // LOAD PAGES
+  async function loadPages() {
+    const snap = await getDocs(collection(db, "pages"));
+    setPages(snap.docs.map(d => d.id));
+  }
 
   // LOAD POSTS
-  async function loadPosts() {
+  async function loadPosts(pageId) {
     if (!pageId) return;
 
-    setLoading(true);
+    const snap = await getDocs(
+      collection(db, "pages", pageId, "posts")
+    );
 
-    try {
-      const ref = collection(db, "pages", pageId, "posts");
-      const snap = await getDocs(ref);
-
-      const list = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
-
-      setPosts(list);
-    } catch (err) {
-      console.error(err);
-    }
-
-    setLoading(false);
+    setPosts(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })));
   }
 
   useEffect(() => {
-    loadPosts();
-  }, [pageId]);
+    loadPages();
+  }, []);
 
-  // SAVE (CREATE / UPDATE)
+  useEffect(() => {
+    loadPosts(selectedPage);
+  }, [selectedPage]);
+
+  // CREATE PAGE
+  async function createPage() {
+    if (!newPageId) return showToast("Enter page id");
+
+    await setDoc(doc(db, "pages", newPageId), {
+      createdAt: Date.now()
+    });
+
+    showToast(`Page ${newPageId} created`);
+    setNewPageId("");
+    loadPages();
+  }
+
+  // CREATE / UPDATE POST (CLEAN NUMERIC ID SYSTEM)
   async function savePost() {
-    if (!pageId) return alert("Enter Page ID");
+    if (!selectedPage) return showToast("Select page");
 
-    // 🚨 LIMIT CHECK
-    if (!editingId && posts.length >= MAX_POSTS) {
-      alert("You can only have 13 posts per page");
-      return;
-    }
+    const postId = editingId || String(posts.length + 1);
 
-    setLoading(true);
-
-    try {
-      const ref = collection(db, "pages", pageId, "posts");
-
-      if (editingId) {
-        await updateDoc(doc(db, "pages", pageId, "posts", editingId), form);
-        setEditingId(null);
-      } else {
-        await addDoc(ref, {
-          ...form,
-          createdAt: Date.now(),
-        });
+    await setDoc(
+      doc(db, "pages", selectedPage, "posts", postId),
+      {
+        ...form,
+        createdAt: Date.now()
       }
+    );
 
-      setForm({
-        title: "",
-        description: "",
-        content: "",
-        image1: "",
-        image2: "",
-      });
+    showToast(editingId ? "Post updated" : "Post created");
 
-      loadPosts();
-    } catch (err) {
-      console.error(err);
-    }
+    setEditingId(null);
+    setForm({
+      title: "",
+      description: "",
+      content: "",
+      image1: "",
+      image2: ""
+    });
 
-    setLoading(false);
+    loadPosts(selectedPage);
   }
 
   // DELETE
-  async function removePost(id) {
-    if (!pageId) return;
+  async function deletePost(id) {
+    await setDoc(
+      doc(db, "pages", selectedPage, "posts", id),
+      {}
+    );
 
-    await deleteDoc(doc(db, "pages", pageId, "posts", id));
-    loadPosts();
+    showToast("Post deleted");
+    loadPosts(selectedPage);
   }
 
-  // EDIT
-  function editPost(post) {
-    setForm(post);
-    setEditingId(post.id);
+  function editPost(p) {
+    setForm(p);
+    setEditingId(p.id);
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-black text-white p-4 md:p-8">
 
-        {/* HEADER */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Admin CMS</h1>
-          <p className="text-gray-500">Pages + 13 post cards system</p>
+      {toast && (
+        <div className="fixed top-4 right-4 bg-white text-black px-4 py-2 rounded">
+          {toast}
         </div>
+      )}
 
-        {/* PAGE SELECT */}
-        <div className="bg-white p-4 rounded-xl shadow mb-4">
+      <div className="max-w-5xl mx-auto space-y-6">
+
+        <h1 className="text-2xl text-center">Admin</h1>
+
+        {/* CREATE PAGE */}
+        <div className="bg-white/5 p-4 rounded">
           <input
-            className="w-full border px-3 py-2 rounded"
-            placeholder="Enter Page ID"
-            value={pageId}
-            onChange={(e) => setPageId(e.target.value)}
+            value={newPageId}
+            onChange={e => setNewPageId(e.target.value)}
+            placeholder="Page ID (1,2,3)"
+            className="p-3 w-full bg-black/40"
           />
 
-          <p className="text-sm text-gray-500 mt-2">
-            Posts: {posts.length} / {MAX_POSTS}
-          </p>
-        </div>
-
-        {/* FORM */}
-        <div className="bg-white p-6 rounded-xl shadow mb-6 space-y-3">
-          <h2 className="font-bold text-lg">
-            {editingId ? "Edit Post" : "Create Post"}
-          </h2>
-
-          <input
-            className="w-full border p-2 rounded"
-            placeholder="Title"
-            value={form.title}
-            onChange={(e) =>
-              setForm({ ...form, title: e.target.value })
-            }
-          />
-
-          <input
-            className="w-full border p-2 rounded"
-            placeholder="Description"
-            value={form.description}
-            onChange={(e) =>
-              setForm({ ...form, description: e.target.value })
-            }
-          />
-
-          <textarea
-            className="w-full border p-2 rounded"
-            placeholder="Content"
-            rows={4}
-            value={form.content}
-            onChange={(e) =>
-              setForm({ ...form, content: e.target.value })
-            }
-          />
-
-          {/* IMAGES */}
-          <div className="grid md:grid-cols-2 gap-3">
-            {["image1", "image2"].map((key) => (
-              <div key={key} className="flex gap-2">
-                <input
-                  className="flex-1 border p-2 rounded"
-                  value={form[key]}
-                  readOnly
-                  placeholder={key}
-                />
-
-                <button
-                  className="bg-blue-600 text-white px-3 rounded"
-                  onClick={() => {
-                    setUploadTarget(key);
-                    setShowModal(true);
-                  }}
-                >
-                  Upload
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={savePost}
-            disabled={loading}
-            className="w-full bg-green-600 text-white py-2 rounded"
-          >
-            {loading
-              ? "Saving..."
-              : editingId
-                ? "Update Post"
-                : "Add Post"}
+          <button onClick={createPage} className="bg-white text-black mt-2 px-4 py-2">
+            Create Page
           </button>
         </div>
 
-        {/* POSTS GRID (13 cards max system) */}
-        <div className="grid md:grid-cols-3 gap-4">
-          {posts.map((p) => (
-            <div
-              key={p.id}
-              className="bg-white p-4 rounded-xl shadow"
-            >
-              <h3 className="font-bold">{p.title}</h3>
-              <p className="text-sm text-gray-500">
-                {p.description}
-              </p>
+        {/* SELECT PAGE */}
+        <select
+          value={selectedPage}
+          onChange={e => setSelectedPage(e.target.value)}
+          className="w-full p-3 bg-white/5"
+        >
+          <option value="">Select Page</option>
+          {pages.map(p => (
+            <option key={p} value={p}>
+              Page {p}
+            </option>
+          ))}
+        </select>
 
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => editPost(p)}
-                  className="bg-yellow-500 text-white px-2 py-1 rounded"
-                >
+        {/* FORM */}
+        {/* FORM */}
+        <div className="bg-white/5 p-4 space-y-3">
+
+          <input
+            placeholder="Title"
+            value={form.title}
+            onChange={e => setForm({ ...form, title: e.target.value })}
+            className="w-full p-3 bg-black/40"
+          />
+
+          <input
+            placeholder="Description"
+            value={form.description}
+            onChange={e => setForm({ ...form, description: e.target.value })}
+            className="w-full p-3 bg-black/40"
+          />
+
+          <textarea
+            placeholder="Content"
+            value={form.content}
+            onChange={e => setForm({ ...form, content: e.target.value })}
+            className="w-full p-3 bg-black/40"
+          />
+
+          {/* ================= IMAGES (FIXED) ================= */}
+          {["image1", "image2"].map((key) => (
+            <div key={key} className="flex gap-2 items-center">
+
+              <input
+                value={form[key]}
+                readOnly
+                placeholder={key}
+                className="flex-1 p-3 bg-black/40 rounded"
+              />
+
+              <button
+                onClick={() => {
+                  setUploadTarget(key);
+                  setShowModal(true);
+                }}
+                className="bg-white text-black px-4 py-2 rounded"
+              >
+                Upload
+              </button>
+
+            </div>
+          ))}
+
+          {/* SAVE BUTTON */}
+          <button
+            onClick={savePost}
+            className="bg-white text-black w-full py-3 rounded"
+          >
+            {editingId ? "Update" : "Create"} Post
+          </button>
+
+        </div>
+        {/* POSTS */}
+        <div className="grid gap-4">
+          {posts.map(p => (
+            <div key={p.id} className="bg-white/5 p-4">
+
+              <h3>{p.title}</h3>
+
+              <div className="flex gap-2 mt-2">
+
+                <button onClick={() => editPost(p)} className="bg-yellow-500 px-2">
                   Edit
                 </button>
 
-                <button
-                  onClick={() => removePost(p.id)}
-                  className="bg-red-600 text-white px-2 py-1 rounded"
-                >
+                <button onClick={() => deletePost(p.id)} className="bg-red-600 px-2">
                   Delete
                 </button>
+
               </div>
+
             </div>
           ))}
         </div>
 
-        {/* CLOUDINARY MODAL */}
-        {showModal && (
-          <CloudinaryModal
-            onClose={() => setShowModal(false)}
-            onUpload={(url) => {
-              setForm({
-                ...form,
-                [uploadTarget]: url,
-              });
-              setShowModal(false);
-            }}
-          />
-        )}
       </div>
+
+
+
+      <button
+        onClick={async () => {
+          try {
+             await signOut(auth);
+            navigate("/login");
+          } catch (error) {
+            console.log(error)
+          }
+
+        }}
+        className="bg-red-600 text-white px-4 py-2 rounded-full"
+      >
+        Sign Out
+      </button>
+
+      {showModal && (
+        <CloudinaryModal
+          onClose={() => setShowModal(false)}
+          onUpload={(url) => {
+            setForm({ ...form, [uploadTarget]: url });
+            setShowModal(false);
+          }}
+        />
+      )}
+
     </div>
   );
 }

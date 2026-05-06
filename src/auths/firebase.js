@@ -9,7 +9,7 @@ import {
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
 
-
+import { getAuth, signInWithEmailAndPassword, signOut} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"
 
 // Firebase config
 const firebaseConfig = {
@@ -25,3 +25,4 @@ const firebaseConfig = {
 // Init Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth();
