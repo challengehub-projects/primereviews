@@ -5,7 +5,7 @@ import { Menu, X } from "lucide-react";
 function Navbar() {
   const [open, setOpen] = useState(false);
 
-  const links = ["Home", "Reviews",  "About"];
+  const links = ["Home", "Reviews/1",  "About"];
 
 
 

@@ -1,15 +1,31 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
 import { db } from "../auths/firebase";
 
 export default function PostPage() {
 
   const { pageId, postId } = useParams();
+
   const [post, setPost] = useState(null);
+  const [comments, setComments] = useState([]);
+
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+
     async function load() {
+
       const snap = await getDoc(
         doc(db, "pages", pageId, "posts", postId)
       );
@@ -17,70 +33,99 @@ export default function PostPage() {
       if (snap.exists()) {
         setPost(snap.data());
       }
+
+      loadComments();
     }
 
     load();
+
   }, [pageId, postId]);
 
-  if (!post) return <div>Loading...</div>;
+  async function loadComments() {
+
+    const snap = await getDocs(
+      collection(db, "pages", pageId, "posts", postId, "comments")
+    );
+
+    const data = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
+
+    data.sort((a, b) =>
+      (b.createdAt || 0) - (a.createdAt || 0)
+    );
+
+    setComments(data);
+  }
+
+  async function submitComment() {
+
+    if (!name || !message) return;
+
+    setLoading(true);
+
+    await addDoc(
+      collection(db, "pages", pageId, "posts", postId, "comments"),
+      {
+        name,
+        message,
+        createdAt: Date.now()
+      }
+    );
+
+    setName("");
+    setMessage("");
+
+    await loadComments();
+
+    setLoading(false);
+  }
+
+  if (!post) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        Loading...
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-black text-white px-4 py-10">
+    <div className="min-h-screen bg-[#0b0b0b] text-white">
 
-      <div className="max-w-2xl mx-auto space-y-5">
+      {/* HERO (UNCHANGED) */}
+      <div className="border-b border-white/10 bg-black/50 backdrop-blur">
 
-        {/* IMAGES (SMALLER + CLEAN) */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="max-w-7xl mx-auto px-6 py-16">
 
-          {post.image1 && (
-            <img
-              src={post.image1}
-              className="h-48 w-full object-cover rounded-lg border border-black"
-            />
-          )}
+          <h1 className="text-4xl md:text-6xl font-bold">
+            {post.title}
+          </h1>
 
-          {post.image2 && (
-            <img
-              src={post.image2}
-              className="h-48 w-full object-cover rounded-lg border border-black"
-            />
-          )}
+          <p className="text-white/50 mt-6">
+            {post.description}
+          </p>
 
         </div>
 
-        {/* TITLE */}
-        <h1 className="text-2xl md:text-3xl font-semibold leading-tight">
-          {post.title}
-        </h1>
+      </div>
 
-        {/* DATE */}
-        <p className="text-white/40 text-xs">
-          {new Date(post.createdAt).toDateString()}
-        </p>
+      {/* GALLERY FIX */}
+      <div className="max-w-7xl mx-auto px-6 py-10">
 
-        {/* CONTENT */}
-        <p className="text-white/70 leading-relaxed whitespace-pre-line text-sm md:text-base">
-          {post.content}
-        </p>
+        {Array.isArray(post.gallery) && post.gallery.length > 0 && (
+          <div className="grid md:grid-cols-2 gap-5 mb-10">
 
-        {/* JOIN BUTTONS */}
-        <div className="flex flex-col md:flex-row gap-3 pt-4">
+            {post.gallery.map((img, i) => (
+              <img
+                key={i}
+                src={typeof img === "string" ? img : img?.url}
+                className="rounded-3xl w-full h-[350px] object-cover"
+              />
+            ))}
 
-          <a
-            href="https://wa.me/YOUR_NUMBER"
-            className="bg-green-500 text-black px-4 py-2 rounded-full text-center text-sm"
-          >
-            Join WhatsApp
-          </a>
-
-          <a
-            href="https://t.me/YOUR_CHANNEL"
-            className="bg-blue-500 text-white px-4 py-2 rounded-full text-center text-sm"
-          >
-            Join Telegram
-          </a>
-
-        </div>
+          </div>
+        )}
 
       </div>
 
