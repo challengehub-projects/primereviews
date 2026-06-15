@@ -17,10 +17,10 @@ export default function ReviewPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const pageNumber = Number(id || 1);
+
   useEffect(() => {
-
     async function load() {
-
       setLoading(true);
 
       const snap = await getDocs(
@@ -44,64 +44,59 @@ export default function ReviewPage() {
     }
 
     load();
-
   }, [id]);
 
-  function nextPage() {
-    navigate(`/reviews/${Number(id) + 1}`);
-  }
-
-  function prevPage() {
-    if (Number(id) > 1) {
-      navigate(`/reviews/${Number(id) - 1}`);
-    }
-  }
-
-  const filtered = posts.filter(p => {
-
-    const text = (
-      p.title ||
-      p.name ||
-      p.postTitle ||
-      ""
-    ).toLowerCase();
-
-    return text.includes(search.toLowerCase());
-  });
+  const filtered = posts.filter(p =>
+    (p.title || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   const getImage = (post) => {
+    if (post?.featuredImage) return post.featuredImage;
 
-    const g = post?.gallery;
-
-    if (Array.isArray(g) && g.length > 0) {
-      return typeof g[0] === "string"
-        ? g[0]
-        : g[0]?.url;
+    if (Array.isArray(post?.sections)) {
+      for (let s of post.sections) {
+        if (Array.isArray(s.images) && s.images.length > 0) {
+          return s.images[0];
+        }
+      }
     }
 
-    if (typeof g === "string") return g;
-
-    return post?.image || post?.imageUrl || post?.photo || null;
+    return null;
   };
 
-  return (
-    <div className="min-h-screen bg-[#0b0b0b] text-white">
+  function goNext() {
+    navigate(`/reviews/${pageNumber + 1}`);
+  }
 
-      {/* HEADER (UNCHANGED) */}
-      <div className="sticky top-0 z-50 bg-black/50 backdrop-blur border-b border-white/10">
+  function goPrev() {
+    if (pageNumber > 1) {
+      navigate(`/reviews/${pageNumber - 1}`);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0b0b0b] text-white py-12">
+
+      {/* TOP BAR (CLEAN + MODERN) */}
+      <div className="border-b border-white/10 bg-black/40 backdrop-blur">
 
         <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
           <div>
-            <h1 className="text-4xl font-bold">Prime Reviews</h1>
-            <p className="text-white/40 mt-1">Page {id}</p>
+            <h1 className="text-3xl md:text-4xl font-bold">
+              Blog Reviews
+            </h1>
+
+            <p className="text-white/40 mt-1 text-sm">
+              Page {pageNumber}
+            </p>
           </div>
 
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search posts..."
-            className="bg-white/5 border border-white/10 px-5 py-3 rounded-2xl w-full md:w-[300px]"
+            className="bg-white/5 border border-white/10 px-5 py-3 rounded-2xl w-full md:w-[320px] outline-none"
           />
 
         </div>
@@ -110,7 +105,7 @@ export default function ReviewPage() {
       {/* CONTENT */}
       <div className="max-w-7xl mx-auto px-6 py-10">
 
-        {/* SKELETON */}
+        {/* LOADING */}
         {loading && (
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-8">
             {[1,2,3,4,5,6].map(i => (
@@ -135,13 +130,15 @@ export default function ReviewPage() {
               const img = getImage(post);
 
               return (
-                <div key={post.id} className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+                <div
+                  key={post.id}
+                  className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden"
+                >
 
                   {img ? (
                     <img
                       src={img}
                       className="h-64 w-full object-cover"
-                      loading="lazy"
                     />
                   ) : (
                     <div className="h-64 flex items-center justify-center text-white/30 bg-white/10">
@@ -152,7 +149,7 @@ export default function ReviewPage() {
                   <div className="p-6">
 
                     <h2 className="text-xl font-bold">
-                      {post.title || post.name || post.postTitle || "Untitled"}
+                      {post.title}
                     </h2>
 
                     <p className="text-white/50 mt-2 line-clamp-3">
@@ -160,8 +157,10 @@ export default function ReviewPage() {
                     </p>
 
                     <button
-                      onClick={() => navigate(`/post/${id}/${post.id}`)}
-                      className="mt-4 bg-white text-black px-4 py-2 rounded-xl"
+                      onClick={() =>
+                        navigate(`/post/${id}/${post.id}`)
+                      }
+                      className="mt-4 bg-white text-black px-4 py-2 rounded-xl hover:opacity-90"
                     >
                       Read →
                     </button>
@@ -175,16 +174,34 @@ export default function ReviewPage() {
           </div>
         )}
 
-        {/* PAGINATION (UNCHANGED) */}
-        <div className="flex justify-center gap-4 mt-20">
+        {/* PREMIUM CENTER PAGINATION */}
+        <div className="flex justify-center items-center mt-20">
 
-          <button onClick={prevPage} className="px-6 py-3 bg-white/10 rounded-xl">
-            ← Previous
-          </button>
+          <div className="flex items-center gap-6 bg-white/5 border border-white/10 px-6 py-4 rounded-full">
 
-          <button onClick={nextPage} className="px-6 py-3 bg-white text-black rounded-xl">
-            Next →
-          </button>
+            {/* LEFT */}
+            <button
+              onClick={goPrev}
+              disabled={pageNumber <= 1}
+              className="text-white text-2xl px-4 py-2 rounded-full hover:bg-white/10 disabled:opacity-30"
+            >
+              ←
+            </button>
+
+            {/* PAGE NUMBER */}
+            <div className="text-lg font-semibold tracking-wide px-4">
+              Page <span className="text-white/60">{pageNumber}</span>
+            </div>
+
+            {/* RIGHT */}
+            <button
+              onClick={goNext}
+              className="text-white text-2xl px-4 py-2 rounded-full hover:bg-white/10"
+            >
+              →
+            </button>
+
+          </div>
 
         </div>
 

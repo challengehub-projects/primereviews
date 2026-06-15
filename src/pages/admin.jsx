@@ -1,13 +1,15 @@
 import { db } from "../auths/firebase";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   setDoc,
   doc,
-  updateDoc,
   getDocs,
-  collection
+  collection,
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
 import { signOut, getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 const auth = getAuth();
 
@@ -18,26 +20,36 @@ export default function AdminPage() {
   const [pages, setPages] = useState([]);
   const [selectedPage, setSelectedPage] = useState("");
   const [posts, setPosts] = useState([]);
-
   const [newPageId, setNewPageId] = useState("");
 
+  const [toast, setToast] = useState("");
+  const [showModal, setShowModal] = useState(false);
+
+  const [uploadMode, setUploadMode] = useState(""); 
+  // "featured" | "section"
+
+  const [editingId, setEditingId] = useState(null);
+
+  const navigate = useNavigate();
+
+  // POST STRUCTURE
   const [form, setForm] = useState({
     title: "",
     description: "",
-    content: "",
-    image1: "",
-    image2: ""
+    featuredImage: "",
+    sections: []
   });
 
-  const [editingId, setEditingId] = useState(null);
-  const [toast, setToast] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [uploadTarget, setUploadTarget] = useState("");
-  const navigate = useNavigate();
+  // SECTION DRAFT
+  const [sectionDraft, setSectionDraft] = useState({
+    title: "",
+    content: "",
+    images: []
+  });
 
   function showToast(msg) {
     setToast(msg);
-    setTimeout(() => setToast(""), 2500);
+    setTimeout(() => setToast(""), 2000);
   }
 
   // LOAD PAGES
@@ -54,10 +66,12 @@ export default function AdminPage() {
       collection(db, "pages", pageId, "posts")
     );
 
-    setPosts(snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    })));
+    setPosts(
+      snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }))
+    );
   }
 
   useEffect(() => {
@@ -70,22 +84,65 @@ export default function AdminPage() {
 
   // CREATE PAGE
   async function createPage() {
-    if (!newPageId) return showToast("Enter page id");
+    if (!newPageId.trim()) return showToast("Enter page ID");
 
     await setDoc(doc(db, "pages", newPageId), {
       createdAt: Date.now()
     });
 
-    showToast(`Page ${newPageId} created`);
     setNewPageId("");
     loadPages();
+    showToast("Page created");
   }
 
-  // CREATE / UPDATE POST (CLEAN NUMERIC ID SYSTEM)
+  // FEATURED IMAGE
+  function setFeaturedImage(url) {
+    setForm(prev => ({
+      ...prev,
+      featuredImage: url
+    }));
+  }
+
+  // SECTION IMAGE
+  function addImageToSection(url) {
+    setSectionDraft(prev => ({
+      ...prev,
+      images: [...(prev.images || []), url]
+    }));
+  }
+
+  // ADD SECTION
+  function addSection() {
+    if (!sectionDraft.title.trim()) {
+      return showToast("Section title required");
+    }
+
+    const newSection = {
+      id: Date.now().toString(),
+      title: sectionDraft.title,
+      content: sectionDraft.content,
+      images: sectionDraft.images || []
+    };
+
+    setForm(prev => ({
+      ...prev,
+      sections: [...(prev.sections || []), newSection]
+    }));
+
+    setSectionDraft({
+      title: "",
+      content: "",
+      images: []
+    });
+
+    showToast("Section added");
+  }
+
+  // SAVE POST
   async function savePost() {
     if (!selectedPage) return showToast("Select page");
 
-    const postId = editingId || String(posts.length + 1);
+    const postId = editingId || Date.now().toString();
 
     await setDoc(
       doc(db, "pages", selectedPage, "posts", postId),
@@ -95,186 +152,110 @@ export default function AdminPage() {
       }
     );
 
-    showToast(editingId ? "Post updated" : "Post created");
-
-    setEditingId(null);
     setForm({
       title: "",
       description: "",
-      content: "",
-      image1: "",
-      image2: ""
+      featuredImage: "",
+      sections: []
     });
 
+    setEditingId(null);
     loadPosts(selectedPage);
+
+    showToast(editingId ? "Post updated" : "Post created");
   }
 
-  // DELETE
+  // DELETE POST
   async function deletePost(id) {
-    await setDoc(
-      doc(db, "pages", selectedPage, "posts", id),
-      {}
-    );
-
-    showToast("Post deleted");
+    await deleteDoc(doc(db, "pages", selectedPage, "posts", id));
     loadPosts(selectedPage);
+    showToast("Post deleted");
   }
 
+  // EDIT POST
   function editPost(p) {
-    setForm(p);
+    setForm({
+      title: p.title || "",
+      description: p.description || "",
+      featuredImage: p.featuredImage || "",
+      sections: p.sections || []
+    });
+
     setEditingId(p.id);
   }
- 
 
   return (
-  <div className="min-h-screen bg-[#0f0f0f] text-white flex">
+    <div className="min-h-screen bg-[#0b0b0b] text-white flex">
 
-    {/* SIDEBAR */}
-    <aside className="w-64 bg-[#151515] border-r border-white/10 p-6 hidden md:flex flex-col">
+      {/* SIDEBAR */}
+      <aside className="w-64 bg-[#151515] border-r border-white/10 p-6 hidden md:flex flex-col">
 
-      <h1 className="text-2xl font-bold mb-10">
-        Twinkle Admin
-      </h1>
+        <h1 className="text-2xl font-bold mb-10">Blog CMS</h1>
 
-      <nav className="space-y-3">
-
-        <button className="w-full text-left px-4 py-3 rounded-xl bg-white text-black font-medium">
+        <button
+          onClick={() => navigate("/")}
+          className="bg-white text-black py-2 rounded-xl mb-3"
+        >
           Dashboard
         </button>
 
-        <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 transition">
-          Posts
-        </button>
-
-        <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 transition">
-          Reviews
-        </button>
-
-      </nav>
-
-      <div className="mt-auto">
         <button
           onClick={async () => {
-            try {
-              await signOut(auth);
-              navigate("/login");
-            } catch (error) {
-              console.log(error);
-            }
+            await signOut(auth);
+            navigate("/login");
           }}
-          className="w-full bg-red-600 hover:bg-red-700 transition py-3 rounded-xl"
+          className="bg-red-600 py-2 rounded-xl"
         >
           Sign Out
         </button>
-      </div>
 
-    </aside>
+      </aside>
 
-    {/* MAIN */}
-    <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+      {/* MAIN */}
+      <main className="flex-1 p-6 overflow-y-auto">
 
-      {/* TOAST */}
-      {toast && (
-        <div className="fixed top-5 right-5 bg-white text-black px-5 py-3 rounded-xl shadow-xl z-50">
-          {toast}
-        </div>
-      )}
+        {/* TOAST */}
+        {toast && (
+          <div className="fixed top-5 right-5 bg-white text-black px-4 py-2 rounded-xl">
+            {toast}
+          </div>
+        )}
 
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl font-bold mb-6">Blog Studio</h2>
 
-        <div>
-          <h2 className="text-3xl font-bold">
-            Dashboard
-          </h2>
-
-          <p className="text-white/50 mt-1">
-            Manage pages and posts
-          </p>
-        </div>
-
-      </div>
-
-      {/* STATS */}
-      <div className="grid md:grid-cols-3 gap-4 mb-8">
-
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <p className="text-white/50 text-sm">Pages</p>
-          <h3 className="text-3xl font-bold mt-2">{pages.length}</h3>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <p className="text-white/50 text-sm">Posts</p>
-          <h3 className="text-3xl font-bold mt-2">{posts.length}</h3>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <p className="text-white/50 text-sm">Current Page</p>
-          <h3 className="text-2xl font-bold mt-2">
-            {selectedPage || "-"}
-          </h3>
-        </div>
-
-      </div>
-
-      {/* CREATE PAGE */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8">
-
-        <h3 className="text-xl font-semibold mb-4">
-          Create Page
-        </h3>
-
-        <div className="flex gap-3">
+        {/* CREATE PAGE */}
+        <div className="bg-white/5 p-4 rounded-xl mb-6 flex gap-3">
 
           <input
             value={newPageId}
             onChange={(e) => setNewPageId(e.target.value)}
-            placeholder="Page ID"
-            className="flex-1 bg-black/30 border border-white/10 p-4 rounded-xl outline-none"
+            placeholder="Create Page ID"
+            className="flex-1 p-3 bg-black/40 rounded-xl"
           />
 
           <button
             onClick={createPage}
-            className="bg-white text-black px-6 rounded-xl font-semibold hover:opacity-90"
+            className="bg-white text-black px-4 rounded-xl"
           >
             Create
           </button>
 
         </div>
 
-      </div>
-
-      {/* PAGE SELECT */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8">
-
-        <h3 className="text-xl font-semibold mb-4">
-          Select Page
-        </h3>
-
+        {/* PAGE SELECT */}
         <select
           value={selectedPage}
           onChange={(e) => setSelectedPage(e.target.value)}
-          className="w-full bg-black/30 border border-white/10 p-4 rounded-xl outline-none"
+          className="w-full p-3 bg-black/40 rounded-xl mb-6"
         >
           <option value="">Select Page</option>
-
-          {pages.map((p) => (
-            <option key={p} value={p}>
-              Page {p}
-            </option>
+          {pages.map(p => (
+            <option key={p} value={p}>{p}</option>
           ))}
         </select>
 
-      </div>
-
-      {/* POST FORM */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8">
-
-        <h3 className="text-xl font-semibold mb-6">
-          {editingId ? "Edit Post" : "Create Post"}
-        </h3>
-
-        <div className="space-y-4">
+        {/* POST FORM */}
+        <div className="bg-white/5 p-6 rounded-xl mb-8">
 
           <input
             placeholder="Title"
@@ -282,7 +263,7 @@ export default function AdminPage() {
             onChange={(e) =>
               setForm({ ...form, title: e.target.value })
             }
-            className="w-full bg-black/30 border border-white/10 p-4 rounded-xl"
+            className="w-full p-3 bg-black/40 rounded-xl mb-3"
           />
 
           <input
@@ -291,103 +272,143 @@ export default function AdminPage() {
             onChange={(e) =>
               setForm({ ...form, description: e.target.value })
             }
-            className="w-full bg-black/30 border border-white/10 p-4 rounded-xl"
+            className="w-full p-3 bg-black/40 rounded-xl mb-3"
           />
 
-          <textarea
-            placeholder="Content"
-            rows="6"
-            value={form.content}
-            onChange={(e) =>
-              setForm({ ...form, content: e.target.value })
-            }
-            className="w-full bg-black/30 border border-white/10 p-4 rounded-xl"
-          />
+          {/* FEATURED IMAGE */}
+          <div className="mb-5">
 
-          {["image1", "image2"].map((key) => (
-            <div key={key} className="flex gap-3">
+            <h4 className="text-white/60 text-sm mb-2">
+              Featured Image
+            </h4>
 
-              <input
-                value={form[key]}
-                readOnly
-                placeholder={key}
-                className="flex-1 bg-black/30 border border-white/10 p-4 rounded-xl"
-              />
+            {form.featuredImage ? (
+              <div className="relative">
+                <img
+                  src={form.featuredImage}
+                  className="w-full h-52 object-cover rounded-xl"
+                />
 
+                <button
+                  onClick={() =>
+                    setForm(prev => ({ ...prev, featuredImage: "" }))
+                  }
+                  className="absolute top-2 right-2 bg-red-600 px-3 py-1 rounded-lg text-sm"
+                >
+                  Remove
+                </button>
+
+                <button
+                  onClick={() => {
+                    setUploadMode("featured");
+                    setShowModal(true);
+                  }}
+                  className="absolute bottom-2 right-2 bg-black/70 px-3 py-1 rounded-lg text-sm"
+                >
+                  Replace
+                </button>
+              </div>
+            ) : (
               <button
                 onClick={() => {
-                  setUploadTarget(key);
+                  setUploadMode("featured");
                   setShowModal(true);
                 }}
-                className="bg-white text-black px-5 rounded-xl font-semibold"
+                className="w-full p-4 border border-dashed border-white/20 rounded-xl"
               >
-                Upload
+                + Upload Featured Image
               </button>
+            )}
 
-            </div>
-          ))}
+          </div>
+
+          {/* SECTION BUILDER */}
+          <div className="border border-white/10 p-4 rounded-xl mb-4">
+
+            <h3 className="mb-3 font-semibold">Add Section</h3>
+
+            <input
+              placeholder="Section Title"
+              value={sectionDraft.title}
+              onChange={(e) =>
+                setSectionDraft({ ...sectionDraft, title: e.target.value })
+              }
+              className="w-full p-3 bg-black/40 rounded-xl mb-3"
+            />
+
+            <textarea
+              placeholder="Section Content"
+              value={sectionDraft.content}
+              onChange={(e) =>
+                setSectionDraft({ ...sectionDraft, content: e.target.value })
+              }
+              className="w-full p-3 bg-black/40 rounded-xl mb-3"
+            />
+
+            {sectionDraft.images.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {sectionDraft.images.map((img, i) => (
+                  <img
+                    key={i}
+                    src={img}
+                    className="h-20 w-full object-cover rounded-lg"
+                  />
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setUploadMode("section");
+                setShowModal(true);
+              }}
+              className="bg-gray-700 px-3 py-2 rounded-xl mb-3"
+            >
+              + Upload Image
+            </button>
+
+            <button
+              onClick={addSection}
+              className="bg-white text-black px-4 py-2 rounded-xl w-full"
+            >
+              + Add Section
+            </button>
+
+          </div>
 
           <button
             onClick={savePost}
-            className="w-full bg-white text-black py-4 rounded-xl font-bold hover:opacity-90"
+            className="w-full bg-white text-black py-3 rounded-xl font-bold"
           >
             {editingId ? "Update Post" : "Create Post"}
           </button>
 
         </div>
 
-      </div>
-
-      {/* POSTS */}
-      <div>
-
-        <h3 className="text-2xl font-bold mb-6">
-          Posts
-        </h3>
-
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {/* POSTS */}
+        <div className="grid md:grid-cols-2 gap-5">
 
           {posts.map((p) => (
-            <div
-              key={p.id}
-              className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden"
-            >
+            <div key={p.id} className="bg-white/5 p-4 rounded-xl">
 
-              {p.image1 && (
-                <img
-                  src={p.image1}
-                  alt=""
-                  className="w-full h-52 object-cover"
-                />
-              )}
+              <h3 className="font-bold">{p.title}</h3>
+              <p className="text-white/50 text-sm">{p.description}</p>
 
-              <div className="p-5">
+              <div className="flex gap-2 mt-4">
 
-                <h4 className="text-xl font-semibold">
-                  {p.title}
-                </h4>
+                <button
+                  onClick={() => editPost(p)}
+                  className="bg-yellow-500 text-black px-3 py-1 rounded"
+                >
+                  Edit
+                </button>
 
-                <p className="text-white/50 text-sm mt-2 line-clamp-3">
-                  {p.description}
-                </p>
-
-                <div className="flex gap-3 mt-5">
-
-                  <button
-                    onClick={() => editPost(p)}
-                    className="flex-1 bg-yellow-500 text-black py-2 rounded-xl font-semibold"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => deletePost(p.id)}
-                    className="flex-1 bg-red-600 py-2 rounded-xl font-semibold"
-                  >
-                    Delete
-                  </button>
-
-                </div>
+                <button
+                  onClick={() => deletePost(p.id)}
+                  className="bg-red-600 px-3 py-1 rounded"
+                >
+                  Delete
+                </button>
 
               </div>
 
@@ -396,21 +417,22 @@ export default function AdminPage() {
 
         </div>
 
-      </div>
+        {/* CLOUDINARY MODAL */}
+        {showModal && (
+          <CloudinaryModal
+            onClose={() => setShowModal(false)}
+            onUpload={(url) => {
+              if (uploadMode === "featured") {
+                setFeaturedImage(url);
+              } else {
+                addImageToSection(url);
+              }
+              setShowModal(false);
+            }}
+          />
+        )}
 
-      {/* CLOUDINARY */}
-      {showModal && (
-        <CloudinaryModal
-          onClose={() => setShowModal(false)}
-          onUpload={(url) => {
-            setForm({ ...form, [uploadTarget]: url });
-            setShowModal(false);
-          }}
-        />
-      )}
-
-    </main>
-
-  </div>
-);
+      </main>
+    </div>
+  );
 }
