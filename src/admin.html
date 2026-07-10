@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Blog Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 p-8">
+
+    <h1 class="text-3xl font-bold mb-8 text-center">Blog Admin Control Panel</h1>
+
+    <div class="grid md:grid-cols-3 gap-8">
+
+        <!-- Create Page -->
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Create New Page</h2>
+            <input id="pageName" type="text" placeholder="Page Name" class="w-full p-2 border rounded mb-3">
+            <button onclick="createPage()" class="bg-blue-600 text-white px-4 py-2 rounded w-full">Create</button>
+        </div>
+
+        <!-- Add Post -->
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Add Post</h2>
+            <select id="pageSelect" class="w-full p-2 border rounded mb-3"></select>
+            <input id="postNumber" type="number" placeholder="Post Number ID (1,2,3...)" class="w-full p-2 border rounded mb-3">
+            <input id="imageUrl" type="text" placeholder="Image URL" class="w-full p-2 border rounded mb-3">
+            <input id="description" type="text" placeholder="Description" class="w-full p-2 border rounded mb-3">
+            <button onclick="addPost()" class="bg-green-600 text-white px-4 py-2 rounded w-full">Add</button>
+        </div>
+
+        <!-- Update Post -->
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Update Post</h2>
+            <select id="updatePageSelect" class="w-full p-2 border rounded mb-3"></select>
+            <input id="postId" type="number" placeholder="Post Number ID" class="w-full p-2 border rounded mb-3">
+            <input id="newImage" type="text" placeholder="New Image URL" class="w-full p-2 border rounded mb-3">
+            <input id="newDesc" type="text" placeholder="New Description" class="w-full p-2 border rounded mb-3">
+            <button onclick="updatePost()" class="bg-yellow-600 text-white px-4 py-2 rounded w-full">Update</button>
+        </div>
+
+    </div>
+
+    <script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import {
+            getFirestore,
+            collection,
+            addDoc,
+            getDocs,
+            doc,
+            setDoc,
+            updateDoc,
+            getDoc
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-_RmLITahJNeHrA84wxXeWEDj8vYLJNg",
+            authDomain: "blog-database-b95f7.firebaseapp.com",
+            projectId: "blog-database-b95f7",
+            storageBucket: "blog-database-b95f7.firebasestorage.app",
+            messagingSenderId: "730060757439",
+            appId: "1:730060757439:web:264a88711bb4215866a90a",
+            measurementId: "G-EX3TPSYK4B"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const pageSelect = document.getElementById("pageSelect");
+        const updatePageSelect = document.getElementById("updatePageSelect");
+
+        let pages = [];
+
+        /* ================= LOAD PAGES ================= */
+        async function loadPages() {
+            const snapshot = await getDocs(collection(db, "pages"));
+            pages = snapshot.docs;
+
+            pageSelect.innerHTML = "";
+            updatePageSelect.innerHTML = "";
+
+            pages.forEach(docSnap => {
+                pageSelect.innerHTML += `<option value="${docSnap.id}">${docSnap.data().name}</option>`;
+                updatePageSelect.innerHTML += `<option value="${docSnap.id}">${docSnap.data().name}</option>`;
+            });
+        }
+
+        /* ================= CREATE PAGE ================= */
+        window.createPage = async function () {
+            const name = document.getElementById("pageName").value.trim();
+            if (!name) return alert("Enter page name");
+
+            const snapshot = await getDocs(collection(db, "pages"));
+            const exists = snapshot.docs.some(doc => doc.data().name.toLowerCase() === name.toLowerCase());
+
+            if (exists) return alert("Page with this name already exists!");
+
+            await addDoc(collection(db, "pages"), { name });
+            alert("Page Created Successfully");
+            document.getElementById("pageName").value = "";
+            loadPages();
+        };
+
+        /* ================= ADD POST ================= */
+        window.addPost = async function () {
+            const pageId = pageSelect.value;
+            const customId = document.getElementById("postNumber").value.trim();
+            const image = document.getElementById("imageUrl").value.trim();
+            const description = document.getElementById("description").value.trim();
+
+            if (!customId) return alert("Enter Post Number ID");
+
+            const postRef = doc(db, "pages", pageId, "posts", customId);
+            const postSnap = await getDoc(postRef);
+
+            if (postSnap.exists()) return alert("Post with this Number ID already exists on this page!");
+
+            const now = new Date();
+            const lastUpdated = now.toLocaleString();
+
+            await setDoc(postRef, { customId: Number(customId), image, description, lastUpdated });
+
+            alert("Post Saved Successfully");
+            document.getElementById("postNumber").value = "";
+            document.getElementById("imageUrl").value = "";
+            document.getElementById("description").value = "";
+        };
+
+        /* ================= UPDATE POST ================= */
+        window.updatePost = async function () {
+            const pageId = updatePageSelect.value;
+            const postId = document.getElementById("postId").value.trim();
+            const image = document.getElementById("newImage").value.trim();
+            const description = document.getElementById("newDesc").value.trim();
+
+            if (!postId) return alert("Enter Post Number ID");
+
+            const postRef = doc(db, "pages", pageId, "posts", postId);
+            const postSnap = await getDoc(postRef);
+
+            if (!postSnap.exists()) return alert("Post not found!");
+
+            const now = new Date();
+            const lastUpdated = now.toLocaleString();
+
+            await updateDoc(postRef, { image, description, lastUpdated });
+
+            alert("Post Updated Successfully");
+            document.getElementById("postId").value = "";
+            document.getElementById("newImage").value = "";
+            document.getElementById("newDesc").value = "";
+        };
+
+        loadPages();
+
+    </script>
+
+</body>
+
+</html>

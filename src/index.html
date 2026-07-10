@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReviewStack</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .card-img {
+            border: 4px solid white;
+        }
+
+        .page-btn:hover {
+            background-color: #16a34a;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 font-sans">
+
+    <!-- NAVBAR -->
+    <header class="bg-black text-white sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex justify-between items-center py-4">
+                <h1 class="text-2xl font-bold tracking-wide">ReviewStack</h1>
+                <nav class="hidden md:flex space-x-8 text-sm font-medium">
+                    <a href="#" class="hover:text-green-400 transition">Home</a>
+                    <a href="#" class="hover:text-green-400 transition">Reviews</a>
+                </nav>
+                <button id="menu-btn" class="md:hidden focus:outline-none">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-black px-6 pb-4 space-y-3">
+            <a href="#" class="block hover:text-green-400">Home</a>
+            <a href="#" class="block hover:text-green-400">Reviews</a>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="text-center py-20 px-6">
+        <h2 class="text-5xl font-bold mb-4">Latest Honest Reviews</h2>
+        <p class="text-gray-600 max-w-2xl mx-auto text-lg">
+            Smart reviews to help you avoid scams and choose better online platforms.
+        </p>
+    </section>
+
+
+    <!-- CARD GRID -->
+    <div id="cardContainer" class="grid md:grid-cols-3 gap-6 p-4"></div>
+
+    <!-- PAGINATION -->
+    <div id="pagination" class="flex justify-center items-center gap-2 my-10 flex-wrap"></div>
+
+
+    <!-- FOOTER -->
+    <footer class="bg-green-700 text-white mt-20">
+        <div class="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-4 gap-10">
+            <div>
+                <h3 class="text-2xl font-bold mb-4">ReviewStack</h3>
+                <p class="text-green-100 leading-relaxed">
+                    Honest reviews to help users make safe online choices. Transparency, trust & protection.
+                </p>
+            </div>
+            <div>
+                <h4 class="font-semibold mb-4">Quick Links</h4>
+                <ul class="space-y-2 text-green-100">
+                    <li><a href="#" class="hover:text-white">Home</a></li>
+                    <li><a href="#" class="hover:text-white">About Us</a></li>
+                    <li><a href="#" class="hover:text-white">Contact Us</a></li>
+                    <li><a href="#" class="hover:text-white">Reviews</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-semibold mb-4">Legal</h4>
+                <ul class="space-y-2 text-green-100">
+                    <li><a href="#" class="hover:text-white">Disclaimer</a></li>
+                    <li><a href="#" class="hover:text-white">Privacy Policy</a></li>
+                    <li><a href="#" class="hover:text-white">Terms & Conditions</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-semibold mb-4">Contact Info</h4>
+                <p class="text-green-100">
+                    Email: support@reviewstack.com<br>
+                    Location: Nigeria<br>
+                    Available: 24/7 Online
+                </p>
+            </div>
+        </div>
+        <div class="bg-green-800 text-center py-6 text-green-200 text-sm">
+            © 2026 ReviewStack. All rights reserved.
+        </div>
+    </footer>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-_RmLITahJNeHrA84wxXeWEDj8vYLJNg",
+            authDomain: "blog-database-b95f7.firebaseapp.com",
+            projectId: "blog-database-b95f7",
+            storageBucket: "blog-database-b95f7.firebasestorage.app",
+            messagingSenderId: "730060757439",
+            appId: "1:730060757439:web:264a88711bb4215866a90a",
+            measurementId: "G-EX3TPSYK4B"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const cardContainer = document.getElementById('cardContainer');
+        const pagination = document.getElementById('pagination');
+
+        let allPages = [];
+        let currentPageIndex = 0; // Index of Firestore page we are viewing
+
+        // Fetch all pages and their posts
+        async function fetchPages() {
+            const pagesSnapshot = await getDocs(collection(db, "pages"));
+            const pages = [];
+
+            for (const pageDoc of pagesSnapshot.docs) {
+                const postsSnapshot = await getDocs(collection(db, "pages", pageDoc.id, "posts"));
+                const posts = [];
+                postsSnapshot.forEach(postDoc => {
+                    const post = postDoc.data();
+                    posts.push({
+                        title: post.description.slice(0, 30) + "...",
+                        desc: post.description,
+                        img1: post.image,
+                        img2: post.image,
+                        customId: post.customId
+                    });
+                });
+                posts.sort((a, b) => a.customId - b.customId);
+
+                pages.push({
+                    id: pageDoc.id,
+                    name: pageDoc.data().name,
+                    posts
+                });
+            }
+
+            // Sort pages by name
+            pages.sort((a, b) => a.name.localeCompare(b.name));
+            allPages = pages;
+            renderCurrentPage();
+            renderPagination();
+        }
+
+        function renderCurrentPage() {
+            cardContainer.innerHTML = '';
+            if (allPages.length === 0) return;
+
+            const page = allPages[currentPageIndex];
+            page.posts.forEach(card => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-800 rounded-3xl overflow-hidden shadow-xl group transition hover:-translate-y-2 relative';
+                div.innerHTML = `
+          <div class="flex relative">
+            <div class="relative w-1/2 overflow-hidden rounded-l-2xl">
+              <img src="${card.img1}" class="w-full h-72 object-cover transform group-hover:scale-110 transition duration-700" alt="">
+            </div>
+            <div class="relative w-1/2 overflow-hidden rounded-r-2xl">
+              <img src="${card.img2}" class="w-full h-72 object-cover transform group-hover:scale-110 transition duration-700" alt="">
+            </div>
+            <div class="absolute top-0 bottom-0 left-1/2 w-[1px] bg-white opacity-80"></div>
+          </div>
+          <div class="p-6 bg-gray-900">
+            <h3 class="text-xl font-semibold mb-3 text-white">${card.title}</h3>
+            <p class="text-gray-300 mb-4">${card.desc}</p>
+            <p class="text-green-400 font-semibold mb-2">Page: ${page.name} | Post ID: ${card.customId}</p>
+          </div>
+        `;
+                cardContainer.appendChild(div);
+            });
+        }
+
+        function renderPagination() {
+            pagination.innerHTML = '';
+            if (allPages.length <= 1) return;
+
+            // Previous
+            const prevBtn = document.createElement('button');
+            prevBtn.className = 'page-btn flex items-center px-3 py-1 rounded border border-gray-400 hover:bg-green-600 hover:text-white';
+            prevBtn.disabled = currentPageIndex === 0;
+            prevBtn.innerHTML = `<svg class='w-5 h-5 mr-1' fill='none' stroke='currentColor' stroke-width='2' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' d='M15 19l-7-7 7-7'/></svg> Previous`;
+            prevBtn.onclick = () => { currentPageIndex--; renderCurrentPage(); renderPagination(); };
+            pagination.appendChild(prevBtn);
+
+            // Page numbers
+            allPages.forEach((p, idx) => {
+                const btn = document.createElement('button');
+                btn.textContent = idx + 1;
+                btn.className = `page-btn px-3 py-1 rounded border border-gray-400 ${idx === currentPageIndex ? 'bg-green-600 text-white' : 'hover:bg-green-600 hover:text-white'}`;
+                btn.onclick = () => { currentPageIndex = idx; renderCurrentPage(); renderPagination(); };
+                pagination.appendChild(btn);
+            });
+
+            // Next
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'page-btn flex items-center px-3 py-1 rounded border border-gray-400 hover:bg-green-600 hover:text-white';
+            nextBtn.disabled = currentPageIndex === allPages.length - 1;
+            nextBtn.innerHTML = `Next <svg class="w-5 h-5 ml-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>`;
+            nextBtn.onclick = () => { currentPageIndex++; renderCurrentPage(); renderPagination(); };
+            pagination.appendChild(nextBtn);
+        }
+
+      
+
+        document.addEventListener('visibilitychange', () => {
+            fetchPages();
+        })
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchPages();
+        })
+    </script>
+
+</body>
+
+</html>
